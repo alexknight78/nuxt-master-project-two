@@ -6,7 +6,11 @@ const props = defineProps({
   modelValue: Boolean,
 })
 
-const emit = defineEmits(['update:modelValue'])
+const isLoading = ref(false)
+const supabase = useSupabaseClient()
+const toast = useToast()
+
+const emit = defineEmits(['update:modelValue', 'saved'])
 
 const defaultSchema = z.object({
   created_at: z.string(),
@@ -36,14 +40,42 @@ const schema = z.intersection(
   defaultSchema
 )
 const form = ref()
+
 const save = async () => {
   if (form.value.errors.length) return
 
+  isLoading.value = true
+  try {
+    const { error } = await supabase
+      .from('transactions')
+      .upsert({ ...state.value })
+
+    if (!error) {
+      toast.add({
+        title: 'Transaction is saved',
+        icon: 'i-heroicons-check-circle',
+      })
+      isOpen.value = false
+      emit('saved')
+      return
+    }
+
+    throw error
+  } catch (error) {
+    toast.add({
+      title: 'Transaction is not saved',
+      description: error.message,
+      icon: 'i-heroicons-exclamation -circle',
+      color: 'red',
+    })
+  } finally {
+    isLoading.value = false
+  }
   // store in supabase
   // form.value.validate()
 }
 const initialState = {
-  type: 'Income',
+  type: '',
   amount: 0,
   created_at: undefined,
   description: undefined,
@@ -119,7 +151,11 @@ const isOpen = computed({
             name="description"
             class="mb-4"
           >
-            <UInput placeholder="Description" />
+            <UInput
+              type="text"
+              placeholder="Description"
+              v-model="state.description"
+            />
           </UFormGroup>
           <UFormGroup
             :required="true"
@@ -134,7 +170,13 @@ const isOpen = computed({
               v-model="state.categorie"
             />
           </UFormGroup>
-          <UButton type="submit" color="black" variant="solid" label="Save" />
+          <UButton
+            type="submit"
+            color="black"
+            variant="solid"
+            label="Save"
+            :loading="isLoading"
+          />
         </UForm>
 
         <template #footer> Footer </template>
